@@ -15,7 +15,7 @@
 
 Opt("MustDeclareVars", 1) ; 1=Variables must be pre-declared, 0=Variables don't need to be pre-declared 
 
-Const $VER                       = "12.04.10"
+Const $VER                       = "12.04.11"
 Const $DEAD_TIME                 = 0
 
 Const $SEC_1                     = 1
