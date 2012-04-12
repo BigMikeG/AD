@@ -15,13 +15,9 @@
 
 Opt("MustDeclareVars", 1) ; 1=Variables must be pre-declared, 0=Variables don't need to be pre-declared 
 
-<<<<<<< HEAD
 Const $VER                       = "12.04.12"
-=======
-Const $VER                       = "12.04.11"
->>>>>>> defd0c002f8af99a2d638b21bd3679b489220e55
-Const $DEAD_TIME                 = 0
 
+Const $DEAD_TIME                 = 0
 Const $SEC_1                     = 1
 Const $ERROR_TMO                 = 30   ; my display fails but recovers sometimes, but it takes more than 5 seconds
 Const $MS_5000                   = 5000
