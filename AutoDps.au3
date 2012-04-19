@@ -15,7 +15,7 @@
 
 Opt("MustDeclareVars", 1) ; 1=Variables must be pre-declared, 0=Variables don't need to be pre-declared 
 
-Const $VER                       = "12.04.12"
+Const $VER                       = "12.04.19"
 
 Const $DEAD_TIME                 = 0
 Const $SEC_1                     = 1
@@ -157,7 +157,7 @@ Func GoButton()
    Local $time = TimerInit() ; start a timer to see how long it takes to build the archives
    Local $timePerArchive
    Local $line2 = ""
-   Local $line3 = " Review file '" & $outputPath & "\" & $LOG_FILE & "' for any issues."
+   ;Local $line3 = " Review file '" & $outputPath & "\" & $LOG_FILE & "' for any issues."
    
    $numArchivesCreated = 0
 
@@ -181,17 +181,21 @@ Func GoButton()
 	  
 	  If $numArchivesCreated <> 0 Then
 		 $timePerArchive = $dif / $numArchivesCreated
-		 $line2 = " " & $timePerArchive & " seconds per archive."
+		 $line2 = $timePerArchive & " seconds per archive."
 	  EndIf
-	  
-	  Local $msg = $line1 & $line2 & $line3
 	  
 	  ; If any messages were logged, open the log file in Notepad.
 	  If $numLogMessages <> 0 Then
 		 Run("notepad.exe " & $outputPath & "\" & $LOG_FILE)
 	  EndIf
 	  
+	  ;Local $msg = $line1 & $line2 & $line3
+	  ;Local $msg = $line1 & $line2
+	  
+	  ;MsgBox(0, "DPS Archive Generator", $msg)
+	  Local $msg = StringFormat("%s\n%s", $line1, $line2)
 	  MsgBox(0, "DPS Archive Generator", $msg)
+
    EndIf ; if AreGuiInputsValid() Then
 EndFunc
 
@@ -438,6 +442,9 @@ Func ArchiveHandler()
 		 
 		 ; Verify that the number of calsets in the line matches the header file. 
 		 If $array[0] >= ($numCalsets + $CAL_OFFSET - 1) Then
+			; Remove leading and trailing white space from each element of the array.
+			$array = RemoveLeadingTrailingWhiteSpace($array)
+			
 			; Get the archive file name.
 			$archiveFileName = ValidateArchiveFileName($array, $lineNumber, $logFh);
 			
@@ -471,6 +478,17 @@ Func ArchiveHandler()
    FileClose($cfgFh)
    FileClose($logFh)
 EndFunc
+
+Func RemoveLeadingTrailingWhiteSpace($array)
+   Local $i
+   
+   For $i = 1 to $array[0]
+	  $array[$i] = StringRegExpReplace($array[$i], "^\s+", "") ; remove leading white space
+	  $array[$i] = StringRegExpReplace($array[$i], "\s+$", "") ; remove trailing white space
+   Next
+   
+   Return $array
+EndFunc			
 
 ;//////////////////////////////////////////////////////////////////////////////
 ; This functions validates the 3 columns in the config file that form the archive name.
@@ -824,6 +842,8 @@ EndFunc
 
 #cs
 Change Log
+V12.04.19 - Cleaned up the final message box.
+          - Removed leading and trailing white space from each field in each row of the config file.
 V12.04.10 - Changed the main error timeout from 15 seconds to 30. 
             Fixed the Auto-Correct message. It was being logged all the time.
 V12.04.04 - Changed the main error timeout from 5 seconds to 15 because my display fails sometimes 
