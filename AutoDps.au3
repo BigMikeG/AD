@@ -9,19 +9,22 @@
 ;
 ; Notes:
 ;  The ini file is saved when the Go button is pressed and all the inputs are valid.
-;  The FileExists function seems to be the biggest time drag. It is used to verify every binary file. 
+;  The FileExists function seems to be the biggest time drag. It is used to verify every binary file.
+;  How about using FileFindFirstFile instead of the Down arrow when looking for binaries.
+
 
 #include <GUIConstantsEx.au3>
 
 Opt("MustDeclareVars", 1) ; 1=Variables must be pre-declared, 0=Variables don't need to be pre-declared 
 
-Const $VER                       = "12.04.19"
+Const $VER                       = "12.08.02"
 
 Const $DEAD_TIME                 = 0
-Const $SEC_1                     = 1
+Const $SEC_1                     = 1    ; 1 second timeout value
+Const $MS_5000                   = 5000 ; 5 second timeout value
 Const $ERROR_TMO                 = 30   ; my display fails but recovers sometimes, but it takes more than 5 seconds
-Const $MS_5000                   = 5000
-Const $ARCHIVE_COMMENTS_LINE1_ID = 1004
+
+Const $ARCHIVE_COMMENTS_LINE1_ID = 1004  ; window control IDs 
 Const $ARCHIVE_COMMENTS_LINE2_ID = 1005
 Const $ARCHIVE_COMMENTS_LINE3_ID = 1006
 Const $ARCHIVE_COMMENTS_LINE4_ID = 1007
@@ -30,9 +33,10 @@ Const $TEMPLATE_FILENAME_ID      = 1023
 Const $NEW_ARCHIVE_FOLDER_ID     = 1025
 Const $BUILD_CAL_ARCHIVE_ID      = 1065
 Const $OPEN_FILENAME_INPUT_ID    = 1048
+
 Const $CAL_OFFSET                = 4    ; column number in the config file where the parts start
-Const $X_INIT                    = 564  ; Set the x and y coordinates where the "Select File" button is located.
-Const $Y_INIT                    = 13   
+Const $X_INIT                    = 564  ; initial x position of the "Select File" button from the left edge of the form.
+Const $Y_INIT                    = 13   ; initial y position of the "Select File" button from the top of the form   
 Const $Y_OFFSET                  = 20   ; offset down to the "Select File" button for the next part
 
 Const $DPS_TOOL    = "DPS_TOOL"
@@ -44,6 +48,7 @@ Const $OUTPUT_PATH = "OUTPUT_PATH"
 Const $OVERWRITE   = "OVERWRITE"
 Const $INI_FILE    = "C:\Temp\AutoDPS.ini"
 Const $LOG_FILE    = "AutoDpsLog.txt"
+Const $REPORT_FILE = "AutoDpsReport.txt"
 
 Global $dpsTool      = ""
 Global $templateFile = ""
@@ -54,7 +59,11 @@ Global $outputPath   = ""
 Global $lineNumber   = 1
 Global $numArchivesCreated = 0
 Global $numLogMessages = 0
+Global $reportFileLine = "";
 
+;
+; Start of code
+;
 Opt("GUIOnEventMode", 1)  ; Change to OnEvent mode 
 GUICreate("Auto DPS Ver " & $VER, 450, 190)
 GUISetOnEvent($GUI_EVENT_CLOSE, "CLOSEClicked")
@@ -141,7 +150,6 @@ Func HelpButton()
    Local $username = EnvGet("USERNAME")
    Local $chrome   = "C:\Users\" & $username & "\AppData\Local\Google\Chrome\Application\chrome.exe" 
    Local $explorer = "C:\Program Files\Internet Explorer\iexplore.exe" 
-   ;Local $site     = " https://sites.google.com/site/autodpstool/user-s-guide"
    Local $site     = " https://gmweb.gm.com/sites/CalSupport/Auto%20DPS"
    
    If FileExists($chrome) Then
@@ -157,7 +165,6 @@ Func GoButton()
    Local $time = TimerInit() ; start a timer to see how long it takes to build the archives
    Local $timePerArchive
    Local $line2 = ""
-   ;Local $line3 = " Review file '" & $outputPath & "\" & $LOG_FILE & "' for any issues."
    
    $numArchivesCreated = 0
 
@@ -179,7 +186,7 @@ Func GoButton()
 		 Local $line1 = $numArchivesCreated & " Archive(s) Created in " & $sec & " seconds."
 	  Endif
 	  
-	  If $numArchivesCreated <> 0 Then
+	  If $numArchivesCreated > 0 Then
 		 $timePerArchive = $dif / $numArchivesCreated
 		 $line2 = $timePerArchive & " seconds per archive."
 	  EndIf
@@ -189,10 +196,6 @@ Func GoButton()
 		 Run("notepad.exe " & $outputPath & "\" & $LOG_FILE)
 	  EndIf
 	  
-	  ;Local $msg = $line1 & $line2 & $line3
-	  ;Local $msg = $line1 & $line2
-	  
-	  ;MsgBox(0, "DPS Archive Generator", $msg)
 	  Local $msg = StringFormat("%s\n%s", $line1, $line2)
 	  MsgBox(0, "DPS Archive Generator", $msg)
 
@@ -406,29 +409,39 @@ Func ArchiveHandler()
    Local $line
    Local $numCalsets
    Local $array
-   Local $logFile = $outputPath & "\" & $LOG_FILE
+   Local $logFile    = $outputPath & "\" & $LOG_FILE
+   Local $reportFile = $outputPath & "\" & $REPORT_FILE
 
-   Local $cfgFh = FileOpen($configFile, 0)
-   Local $logFh = FileOpen($logFile, 2) ; open for Write Mode (erase previous contents) 
+   Local $cfgFh    = FileOpen($configFile, 0)
+   Local $logFh    = FileOpen($logFile, 2)    ; 2 = Write Mode (erase previous contents) 
+   Local $reportFh = FileOpen($reportFile, 1) ; 1 = Write mode (append to end of file)
+
 
    ; Check if the log file opened for writing OK
    If $logFh = -1 Then
-	  MsgBox(0, "Error", "Unable to write log file: " & $LOG_FILE)
+	  MsgBox(0, "Non-Fatal Error", "Unable to write log file. If any errors are detected they won't be written to: " & $LOG_FILE)
    EndIf
 
-   ; Check if file opened for reading OK
+   ; Check if the report file opened for writing OK
+   If $reportFh = -1 Then
+	  MsgBox(0, "Non-Fatal Error", "Unable to write report file (archive file names and part numbers with DLS): " & $REPORT_FILE)
+   EndIf
+
+   ; Check if the config file opened for reading OK
    If $cfgFh = -1 Then
 	  ExitGracefully("Unable to open file: " & $configFile)
    Else
 	  ; Read the header file to get the number of calsets.
-	  $line = FileReadLine($configFile, 1)  ; Read a line from the config file
+	  $line = FileReadLine($configFile, 1)  ; line 1 is the header row
 	  $line = StringReplace($line, '"', '') ; remove adouble qoutes
 	  $array = StringSplit($line, ",")      ; split on the comma and save each field in an array of strings
 	  $numCalsets = $array[0] - 3           ; number of columns minus the 3 used for the archive name
 	  
-	  ; If the header row ends with a comma, don't count the last column. 
+	  WriteHeaderRowToReport($reportFh, $array)
+
+      ; If the header row ends with a comma, don't count the last column. 
 	  if $array[$array[0]] == "" Then
-		 $numCalsets--
+		 $numCalsets = $numCalsets - 1
 	  EndIf
 	  
 	  ; Read the first archive row
@@ -459,7 +472,7 @@ Func ArchiveHandler()
 			   Else  
 				  ; Create the archive if it doesn't exist or the overwrite checkbox is checked.
 				  If (FileExists($fullArchiveName) = 0) Or (IsOverwriteChecked()) Then
-					 CreateArchive($archiveFileName, $array, $lineNumber, $numCalsets)
+					 CreateArchive($archiveFileName, $array, $lineNumber, $numCalsets, $reportFh)
 				  EndIf
 			   EndIf ; If IsAnyPartBlank($array) Then
 			EndIf ; if $archiveFileName <> "" Then
@@ -474,11 +487,34 @@ Func ArchiveHandler()
 	  WEnd ; End of the main while loop that processes archive records
    EndIf ; If $file = -1 Then
 
-   ; Close the Archive Configuration file and log file.
+   ; Close the Archive Configuration, log and report files.
    FileClose($cfgFh)
+   If $numLogMessages = 0 Then
+	  FileWriteLineToLog($logFh, "No issues found.")
+	  ; Set $numLogMessages to zero to prevent the file from getting opened in notepad later.
+	  $numLogMessages = 0
+   EndIf
    FileClose($logFh)
+   FileClose($reportFh)
 EndFunc
 
+;//////////////////////////////////////////////////////////////////////////////
+; This functions writes the header line to the report file.
+;//////////////////////////////////////////////////////////////////////////////
+Func WriteHeaderRowToReport($fh, $array)
+   ; Verify that we are at the beginning of the file.
+   ; If not the header is already written.
+   Local $pos = FileGetPos($fh)
+   If $pos = 0 Then
+	  Local $header = "Archive Name (.zip),Utility File"
+	  For $i = $CAL_OFFSET To $array[0] Step 1
+		 $header = $header & "," & $array[$i] 
+	  Next
+
+	  FileWriteLine($fh, $header)
+   EndIf
+EndFunc
+   
 Func RemoveLeadingTrailingWhiteSpace($array)
    Local $i
    
@@ -576,12 +612,15 @@ EndFunc
 ;//////////////////////////////////////////////////////////////////////////////
 ; This function creates an archive.
 ;//////////////////////////////////////////////////////////////////////////////
-Func CreateArchive($file, $array, $lineNumber, $numCalsets)
+Func CreateArchive($file, $array, $lineNumber, $numCalsets, $fh)
    Local $rv = 0
    Local $start
    Local $elapsed = 0
    Local $y
    
+   ; Copy the archive file name to the report file line.
+   $reportFileLine = $file
+			   
    ; Verify that the Service window is active before starting.
    CheckForSpatWindowActive()
    
@@ -601,6 +640,8 @@ Func CreateArchive($file, $array, $lineNumber, $numCalsets)
       SelectBinaryFile($y, ($binaryPath & "\"), $array[$i + $CAL_OFFSET], $lineNumber)
    Next
 
+   FileWriteLine($fh, $reportFileLine)
+   
    ; Click the Build button and wait for the Archive Successful message.
    $rv = 0
    $elapsed = 0
@@ -763,6 +804,7 @@ Func SetEditBoxVerifyFile($title, $id, $text)
    Local $start
    Local $elapsed = 0
    Local $file
+   Local $path
    Local $exists = 0
 
    Sleep($DEAD_TIME) ; wait a little for the window to settle
@@ -773,14 +815,27 @@ Func SetEditBoxVerifyFile($title, $id, $text)
 	  ControlSend($title, "", $id, "+{END}")
 	  ControlSend($title, "", $id, $text)
 	  ControlSend($title, "", $id, "{DOWN}")
-	  $file = ControlGetText ($title, "", $id)
-	  $exists = FileExists($file)
+	  $path = ControlGetText ($title, "", $id)
+	  $exists = FileExists($path)
 	  $elapsed = TimerDiff($start)
    WEnd
    
    If $exists = 0 Then
 	  FatalError("Part " & $text & " does not exist. Exiting.")
+   Else
+	  ; File exists. Add it to the report file line.
+	  $file = GetFileNameWithExtension($path)
+	  $reportFileLine = $reportFileLine & "," & $file
    EndIf
+EndFunc
+
+;//////////////////////////////////////////////////////////////////////////////
+; This function returns a file name with it's extension from a full path.
+;//////////////////////////////////////////////////////////////////////////////
+Func GetFileNameWithExtension($path)
+	Local $pattern = '^.*\\'
+	Local $replace = ''
+    Return StringRegExpReplace($path, $pattern, $replace)
 EndFunc
 
 ;//////////////////////////////////////////////////////////////////////////////
