@@ -17,9 +17,9 @@
 
 Opt("MustDeclareVars", 1) ; 1=Variables must be pre-declared, 0=Variables don't need to be pre-declared 
 
-Const $VER                       = "12.08.02"
+Const $VER                       = "12.08.31"
 
-Const $DEAD_TIME                 = 0
+Const $DEAD_TIME                 = 100  ; milliseconds
 Const $SEC_1                     = 1    ; 1 second timeout value
 Const $MS_5000                   = 5000 ; 5 second timeout value
 Const $ERROR_TMO                 = 30   ; my display fails but recovers sometimes, but it takes more than 5 seconds
@@ -434,6 +434,7 @@ Func ArchiveHandler()
 	  ; Read the header file to get the number of calsets.
 	  $line = FileReadLine($configFile, 1)  ; line 1 is the header row
 	  $line = StringReplace($line, '"', '') ; remove adouble qoutes
+      $line = StringRegExpReplace($line, ",*$", "") ; Remove any trailing commas
 	  $array = StringSplit($line, ",")      ; split on the comma and save each field in an array of strings
 	  $numCalsets = $array[0] - 3           ; number of columns minus the 3 used for the archive name
 	  
