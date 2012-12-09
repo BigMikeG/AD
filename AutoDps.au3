@@ -17,9 +17,9 @@
 
 Opt("MustDeclareVars", 1) ; 1=Variables must be pre-declared, 0=Variables don't need to be pre-declared 
 
-Const $VER                       = "12.08.31"
+Const $VER                       = "12.09.07"
 
-Const $DEAD_TIME                 = 100  ; milliseconds
+Const $DEAD_TIME                 = 0    ; milliseconds
 Const $SEC_1                     = 1    ; 1 second timeout value
 Const $MS_5000                   = 5000 ; 5 second timeout value
 Const $ERROR_TMO                 = 30   ; my display fails but recovers sometimes, but it takes more than 5 seconds
@@ -363,7 +363,7 @@ Func ClickNewArchiveAndVerify()
    Local $elapsed = 0
    Local $start = TimerInit() ; start a timer to break us out or the loop
    
-   Sleep($DEAD_TIME) ; pause for the window needs a little time to settle
+   Sleep($DEAD_TIME) ; delay for the window to open
    
    While (($rv = 0) And ($elapsed < $MS_5000))
 	  ControlClick("Spat","Create a New Archive",1080)
@@ -782,9 +782,16 @@ Func SetEditBoxNoVerify($title, $id, $text)
 
    $start = TimerInit() ; start a timer to break us out or the loop
    While (($text <> $rv) And ($elapsed < $MS_5000))
+	  ; There may be something in the file text box. Try to select it.
 	  ControlSend($title, "", $id, "^{HOME}")
 	  ControlSend($title, "", $id, "+{END}")
+	  
+	  ; Now paste the filename into the file text box 
+	  ; (overwriting whatever may have been selected above).
 	  ControlSend($title, "", $id, $text)
+	  
+	  ; Read back what is in the text box so that we can verify that it is what 
+	  ; we attempted to paste in there.
 	  $rv = ControlGetText ($title, "", $id)
 	  $elapsed = TimerDiff($start)
    WEnd
